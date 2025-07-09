@@ -13,9 +13,29 @@ const SHEET_NAME = '1on1'; // メインで操作するシート名
 const CONTACT_SHEET_NAME = 'フロント担当者'; // 担当者名とメールアドレスが記載されたシート名
 const CC_MAP_SHEET_NAME = '営業担当者マップ'; // CC担当者名とメールアドレスが記載されたシート名
 const CONSTRUCTION_MAP_SHEET_NAME = '工事会社マップ'; // 工事会社名とメールアドレスが記載されたシート名
-const COMMON_CC_EMAIL = 'orehazyaian@gmail.com'; // 固定で追加する共通CCアドレス
+const COMMON_CC_EMAIL = 'sales@ubiden.com'; // 固定で追加する共通CCアドレス
 const REMINDER_DAYS_BEFORE = 3; // 理事会日の何日前に「前」メールを送信するか
 const REMINDER_DAYS_AFTER = 2;  // 理事会日の何日後に「後」メールを送信するか
+
+// 署名
+const SIGNATURE = `
+--
+--------------------------------------------------------------------
+森田　稔己 / Toshiki Morita
+ユビ電株式会社 
+
+ビジネスストラテジー／カスタマーサクセス
+
+〒108-0073　東京都港区三田一丁目1番14号　Bizflex麻布十番4階
+
+TEL 080-7439-7098 
+
+名刺：https://8card.net/virtual_cards/1jlunfBTRHBP85DHWGqskA
+
+HP： https://www.ubiden.com
+└───────────────┘
+--------------------------------------------------------------------
+`.trim();
 // --- 設定項目ここまで ---
 
 /**
@@ -32,7 +52,7 @@ function createDailyTrigger() {
   // 新しいトリガーを設定（毎日午前9時〜10時）
   ScriptApp.newTrigger('sendScheduledEmails')
     .timeBased()
-    .atHour(8)
+    .atHour(9)
     .everyDays(1)
     .create();
   SpreadsheetApp.getUi().alert('毎日午前9時〜10時にメールを自動送信する設定が完了しました。');
@@ -195,6 +215,9 @@ function composeBeforeEmailContent(params) {
     '',
     'ご多用のところ恐縮ではございますが、理事会にてEV充電設備のご案内をいただけますよう、',
     '何卒よろしくお願い申し上げます。',
+    '',
+    '',
+    SIGNATURE
   ].join('\n');
 
   return { subject, body };
@@ -228,6 +251,9 @@ function composeAfterEmailContent(params) {
     '- 今後の進め方についてのご検討内容 など',
     '---',
     '※本メールは社内での連携状況にかかわらず、自動的にお送りしております。すでにご対応済みの場合はご容赦くださいませ。',
+    '',
+    '',
+    SIGNATURE
   ].join('\n');
 
   return { subject, body };
