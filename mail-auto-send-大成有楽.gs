@@ -210,7 +210,7 @@ function composeBeforeEmailContent(params) {
 
   const subject = `[ユビ電]理事会でのEV充電設備に関するご案内について（${property}）`;
   const body = [
-    `${companyName}   ${branch}`.trim(),
+    companyName,
     `${contactName} 様`,
     '',
     'いつもお世話になっております。ユビ電の森田です。',
@@ -239,7 +239,7 @@ function composeAfterEmailContent(params) {
 
   const subject = `[ユビ電]EV充電設備ご提案の理事会後の状況について（${property}）`;
   const body = [
-    `${companyName}   ${branch}`.trim(),
+    companyName,
     `${contactName} 様`,
     '',
     'いつもお世話になっております。ユビ電の森田です。',
@@ -427,7 +427,7 @@ function createGmailFormula(params) {
   if (mode === 'before') {
     subject = `[ユビ電]理事会でのEV充電設備に関するご案内について（${property}）`;
     bodyTemplate = [
-      `${companyName}   ${branch}`.trim(),
+      companyName,
       `${contactName} 様`,
       '',
       'いつもお世話になっております。ユビ電の森田です。',
@@ -441,7 +441,7 @@ function createGmailFormula(params) {
   } else {
     subject = `[ユビ電]EV充電設備ご提案の理事会後の状況について（${property}）`;
     bodyTemplate = [
-      `${companyName}   ${branch}`.trim(),
+      companyName,
       `${contactName} 様`,
       '',
       'いつもお世話になっております。ユビ電の森田です。',
