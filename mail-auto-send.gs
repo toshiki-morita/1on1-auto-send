@@ -521,7 +521,14 @@ function createEmailMap(ss, sheetName, nameHeader, emailHeader) {
   const colEmail = idx(emailHeader);
   if (colName === 0 || colEmail === 0) return null;
 
-  const data = mapSheet.getRange(2, 1, mapSheet.getLastRow() - 1, mapSheet.getLastColumn()).getValues();
+  const lastRow = mapSheet.getLastRow();
+
+  // データ行が存在しない場合（ヘッダーのみの場合）は空のマップを返す
+  if (lastRow < 2) {
+    return new Map();
+  }
+
+  const data = mapSheet.getRange(2, 1, lastRow - 1, mapSheet.getLastColumn()).getValues();
   const emailMap = new Map();
   data.forEach(row => {
     const name = row[colName - 1];
