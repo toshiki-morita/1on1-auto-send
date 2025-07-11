@@ -285,16 +285,20 @@ function generateMailLinks() {
     return;
   }
 
-  // 各種マップを作成 (シートやヘッダーがなくてもエラーにしない)
-  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス') || new Map();
-  const ccContactMap = createEmailMap(ss, CC_MAP_SHEET_NAME, '営業担当者名', 'メールアドレス') || new Map();
-  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス') || new Map();
+  // 各種マップを作成
+  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス');
+  const ccContactMap = createEmailMap(ss, CC_MAP_SHEET_NAME, '営業担当者名', 'メールアドレス');
+  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス');
 
-  // フロント担当者マップは必須とする
-  if (contactMap.size === 0 && (ss.getSheetByName(CONTACT_SHEET_NAME) === null || ss.getSheetByName(CONTACT_SHEET_NAME).getLastRow() < 2)) {
-     ui.alert('「フロント担当者」シートにデータがありません。処理を中断します。');
-     return;
+  // マップの存在チェック (フロント担当者のみ必須)
+  if (!contactMap) {
+    ui.alert('「フロント担当者」シートが見つからないか、ヘッダー名が正しくありません。処理を中断します。');
+    return;
   }
+
+  // CCマップが存在しない場合は空のマップとして扱う
+  const finalCcContactMap = ccContactMap || new Map();
+  const finalConstructionMap = constructionMap || new Map();
 
   const idx = getHeaderIndexFunction(sheet);
   const cols = {
@@ -351,15 +355,15 @@ function generateMailLinks() {
     const ccEmails = [COMMON_CC_EMAIL];
     if (cols.ccStaff1 > 0) {
       const ccStaff1Name = row[cols.ccStaff1 - 1];
-      if (ccStaff1Name) ccEmails.push(ccContactMap.get(ccStaff1Name.toString().trim()));
+      if (ccStaff1Name) ccEmails.push(finalCcContactMap.get(ccStaff1Name.toString().trim()));
     }
     if (cols.ccStaff2 > 0) {
       const ccStaff2Name = row[cols.ccStaff2 - 1];
-      if (ccStaff2Name) ccEmails.push(ccContactMap.get(ccStaff2Name.toString().trim()));
+      if (ccStaff2Name) ccEmails.push(finalCcContactMap.get(ccStaff2Name.toString().trim()));
     }
     if (cols.constructionCompany > 0) {
       const companyName = row[cols.constructionCompany - 1];
-      if (companyName) ccEmails.push(constructionMap.get(companyName.toString().trim()));
+      if (companyName) ccEmails.push(finalConstructionMap.get(companyName.toString().trim()));
     }
     const ccString = ccEmails.filter(Boolean).join(',');
 
