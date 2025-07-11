@@ -285,15 +285,15 @@ function generateMailLinks() {
     return;
   }
 
-  // 各種マップを作成
-  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス');
-  const ccContactMap = createEmailMap(ss, CC_MAP_SHEET_NAME, '営業担当者名', 'メールアドレス');
-  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス');
+  // 各種マップを作成 (シートやヘッダーがなくてもエラーにしない)
+  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス') || new Map();
+  const ccContactMap = createEmailMap(ss, CC_MAP_SHEET_NAME, '営業担当者名', 'メールアドレス') || new Map();
+  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス') || new Map();
 
-  // マップの存在チェック
-  if (!contactMap || !ccContactMap || !constructionMap) {
-    ui.alert('「フロント担当者」「営業担当者マップ」「工事会社マップ」のいずれかのシートが見つからないか、ヘッダー名が正しくありません。');
-    return;
+  // フロント担当者マップは必須とする
+  if (contactMap.size === 0 && (ss.getSheetByName(CONTACT_SHEET_NAME) === null || ss.getSheetByName(CONTACT_SHEET_NAME).getLastRow() < 2)) {
+     ui.alert('「フロント担当者」シートにデータがありません。処理を中断します。');
+     return;
   }
 
   const idx = getHeaderIndexFunction(sheet);
