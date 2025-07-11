@@ -71,9 +71,9 @@ function sendScheduledEmails() {
   }
 
   // 各種メールアドレスのマップを作成
-  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス');
+  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス', '会社名');
   const ccContactMap = createEmailMap(ss, CC_MAP_SHEET_NAME, '営業担当者名', 'メールアドレス');
-  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス');
+  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス', '会社名');
 
   if (!contactMap || !ccContactMap || !constructionMap) {
     console.error('「フロント担当者」「営業担当者マップ」「工事会社マップ」のいずれかのシートまたはヘッダーが正しくありません。');
@@ -126,33 +126,38 @@ function sendScheduledEmails() {
       return; // 自動送信無効フラグが立っていればスキップ
     }
 
+    const contactInfo = contactMap.get(contactName.toString().trim());
+    if (!contactInfo || !contactInfo.email) {
+      console.log(`行 ${currentRowNum}: フロント担当者「${contactName}」のメールアドレスまたは会社情報が見つかりません。`);
+      return;
+    }
+    const toEmail = contactInfo.email;
+    const companyName = contactInfo.company;
+
     const commonParams = {
       property: propertyName,
       meetingDate: meetingDate,
       contactName: contactName,
       branch: cols.branch > 0 ? row[cols.branch - 1] : '',
-      companyName: ss.getName()
+      companyName: companyName
     };
-
-    const toEmail = contactMap.get(contactName.toString().trim());
-    if (!toEmail) {
-      console.log(`行 ${currentRowNum}: フロント担当者「${contactName}」のメールアドレスが見つかりません。`);
-      return;
-    }
 
     // CCメールアドレスのリストを作成 (共通化)
     const ccEmails = [COMMON_CC_EMAIL];
-    if (cols.ccStaff1 > 0) {
-      const ccStaff1Name = row[cols.ccStaff1 - 1];
-      if (ccStaff1Name) ccEmails.push(ccContactMap.get(ccStaff1Name.toString().trim()));
+    const ccStaff1Name = cols.ccStaff1 > 0 ? row[cols.ccStaff1 - 1] : '';
+    if (ccStaff1Name) {
+      const ccInfo = ccContactMap.get(ccStaff1Name.toString().trim());
+      if (ccInfo && ccInfo.email) ccEmails.push(ccInfo.email);
     }
-    if (cols.ccStaff2 > 0) {
-      const ccStaff2Name = row[cols.ccStaff2 - 1];
-      if (ccStaff2Name) ccEmails.push(ccContactMap.get(ccStaff2Name.toString().trim()));
+    const ccStaff2Name = cols.ccStaff2 > 0 ? row[cols.ccStaff2 - 1] : '';
+    if (ccStaff2Name) {
+      const ccInfo = ccContactMap.get(ccStaff2Name.toString().trim());
+      if (ccInfo && ccInfo.email) ccEmails.push(ccInfo.email);
     }
-    if (cols.constructionCompany > 0) {
-      const companyName = row[cols.constructionCompany - 1];
-      if (companyName) ccEmails.push(constructionMap.get(companyName.toString().trim()));
+    const constructionCompanyName = cols.constructionCompany > 0 ? row[cols.constructionCompany - 1] : '';
+    if (constructionCompanyName) {
+      const constructionInfo = constructionMap.get(constructionCompanyName.toString().trim());
+      if (constructionInfo && constructionInfo.email) ccEmails.push(constructionInfo.email);
     }
     const ccString = ccEmails.filter(Boolean).join(',');
 
@@ -286,9 +291,9 @@ function generateMailLinks() {
   }
 
   // 各種マップを作成
-  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス');
+  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス', '会社名');
   const ccContactMap = createEmailMap(ss, CC_MAP_SHEET_NAME, '営業担当者名', 'メールアドレス');
-  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス');
+  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス', '会社名');
 
   // マップの存在チェック (フロント担当者のみ必須)
   if (!contactMap) {
@@ -345,25 +350,30 @@ function generateMailLinks() {
       return;
     }
 
-    const toEmail = contactMap.get(contactName.toString().trim());
-    if (!toEmail) {
-      console.log(`行 ${currentRowNum}: フロント担当者「${contactName}」のメールアドレスが見つかりません。スキップします。`);
+    const contactInfo = contactMap.get(contactName.toString().trim());
+    if (!contactInfo || !contactInfo.email) {
+      console.log(`行 ${currentRowNum}: フロント担当者「${contactName}」のメールアドレスまたは会社情報が見つかりません。スキップします。`);
       return;
     }
+    const toEmail = contactInfo.email;
+    const companyName = contactInfo.company;
 
     // CCメールアドレスのリストを作成
     const ccEmails = [COMMON_CC_EMAIL];
-    if (cols.ccStaff1 > 0) {
-      const ccStaff1Name = row[cols.ccStaff1 - 1];
-      if (ccStaff1Name) ccEmails.push(finalCcContactMap.get(ccStaff1Name.toString().trim()));
+    const ccStaff1Name = cols.ccStaff1 > 0 ? row[cols.ccStaff1 - 1] : '';
+    if (ccStaff1Name) {
+      const ccInfo = finalCcContactMap.get(ccStaff1Name.toString().trim());
+      if (ccInfo && ccInfo.email) ccEmails.push(ccInfo.email);
     }
-    if (cols.ccStaff2 > 0) {
-      const ccStaff2Name = row[cols.ccStaff2 - 1];
-      if (ccStaff2Name) ccEmails.push(finalCcContactMap.get(ccStaff2Name.toString().trim()));
+    const ccStaff2Name = cols.ccStaff2 > 0 ? row[cols.ccStaff2 - 1] : '';
+    if (ccStaff2Name) {
+      const ccInfo = finalCcContactMap.get(ccStaff2Name.toString().trim());
+      if (ccInfo && ccInfo.email) ccEmails.push(ccInfo.email);
     }
-    if (cols.constructionCompany > 0) {
-      const companyName = row[cols.constructionCompany - 1];
-      if (companyName) ccEmails.push(finalConstructionMap.get(companyName.toString().trim()));
+    const constructionCompanyName = cols.constructionCompany > 0 ? row[cols.constructionCompany - 1] : '';
+    if (constructionCompanyName) {
+      const constructionInfo = finalConstructionMap.get(constructionCompanyName.toString().trim());
+      if (constructionInfo && constructionInfo.email) ccEmails.push(constructionInfo.email);
     }
     const ccString = ccEmails.filter(Boolean).join(',');
 
@@ -374,7 +384,7 @@ function generateMailLinks() {
       contactName: contactName,
       branch: cols.branch > 0 ? row[cols.branch - 1] : '',
       cc: ccString,
-      companyName: ss.getName()
+      companyName: companyName
     };
 
     // 「理事会前」のリンクを生成
@@ -516,14 +526,15 @@ function getHeaderIndexFunction(sheet) {
   return (name) => headers.findIndex(h => h && h.toString().includes(name)) + 1;
 }
 
-function createEmailMap(ss, sheetName, nameHeader, emailHeader) {
+function createEmailMap(ss, sheetName, nameHeader, emailHeader, companyHeader) {
   const mapSheet = ss.getSheetByName(sheetName);
   if (!mapSheet) return null;
 
   const idx = getHeaderIndexFunction(mapSheet);
-  const colName = idx(nameHeader);
-  const colEmail = idx(emailHeader);
-  if (colName === 0 || colEmail === 0) return null;
+  const nameCol = idx(nameHeader);
+  const emailCol = idx(emailHeader);
+  const companyCol = companyHeader ? idx(companyHeader) : 0;
+  if (nameCol === 0 || emailCol === 0) return null;
 
   const lastRow = mapSheet.getLastRow();
 
@@ -534,11 +545,14 @@ function createEmailMap(ss, sheetName, nameHeader, emailHeader) {
 
   const data = mapSheet.getRange(2, 1, lastRow - 1, mapSheet.getLastColumn()).getValues();
   const emailMap = new Map();
-  data.forEach(row => {
-    const name = row[colName - 1];
-    const email = row[colEmail - 1];
-    if (name && email) {
-      emailMap.set(name.toString().trim(), email.toString().trim());
+  data.forEach((row, i) => {
+    const name = row[nameCol - 1];
+    const email = row[emailCol - 1];
+    if (name) {
+      emailMap.set(name.toString().trim(), {
+        email: email || '',
+        company: companyCol > 0 ? row[companyCol - 1] : ''
+      });
     }
   });
   return emailMap;
