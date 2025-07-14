@@ -275,6 +275,7 @@ function onOpen() {
     .addItem('✉️ メールリンクを一括生成', 'generateMailLinks')
     .addSeparator()
     .addItem('⚙️ IDを一括付番', 'assignUniqueIds')
+    .addItem('🔗 Salesforceリンクを作成', 'createSalesforceLinks')
     .addToUi();
 }
 
@@ -527,33 +528,110 @@ function getHeaderIndexFunction(sheet) {
 }
 
 function createEmailMap(ss, sheetName, nameHeader, emailHeader, companyHeader) {
-  const mapSheet = ss.getSheetByName(sheetName);
-  if (!mapSheet) return null;
-
-  const idx = getHeaderIndexFunction(mapSheet);
-  const nameCol = idx(nameHeader);
-  const emailCol = idx(emailHeader);
-  const companyCol = companyHeader ? idx(companyHeader) : 0;
-  if (nameCol === 0 || emailCol === 0) return null;
-
-  const lastRow = mapSheet.getLastRow();
-
-  // データ行が存在しない場合（ヘッダーのみの場合）は空のマップを返す
-  if (lastRow < 2) {
-    return new Map();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    console.error(`シート「${sheetName}」が見つかりません。`);
+    return null;
   }
 
-  const data = mapSheet.getRange(2, 1, lastRow - 1, mapSheet.getLastColumn()).getValues();
-  const emailMap = new Map();
-  data.forEach((row, i) => {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const nameCol = headers.indexOf(nameHeader) + 1;
+  const emailCol = headers.indexOf(emailHeader) + 1;
+  const companyCol = companyHeader ? headers.indexOf(companyHeader) + 1 : 0;
+
+  if (nameCol === 0 || emailCol === 0) {
+    console.error(`シート「${sheetName}」に必要なヘッダー（${nameHeader}, ${emailHeader}）が見つかりません。`);
+    return null;
+  }
+
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  const map = new Map();
+  data.forEach(row => {
     const name = row[nameCol - 1];
     const email = row[emailCol - 1];
-    if (name) {
-      emailMap.set(name.toString().trim(), {
-        email: email || '',
-        company: companyCol > 0 ? row[companyCol - 1] : ''
-      });
+    if (name && email) {
+      const entry = { email: email };
+      if (companyCol > 0) {
+        entry.company = row[companyCol - 1] || '';
+      }
+      map.set(name.toString().trim(), entry);
     }
   });
-  return emailMap;
+  return map;
+}
+
+// ✅ 新機能のみ追記：他の関数には一切変更を加えません
+function createSalesforceLinks() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const mainSheet = ss.getSheetByName('1on1'); // メインのシート
+  const reportSheet = ss.getSheetByName('Salesforceレポート'); // インポートしたレポートタブ（名前は必要に応じて変更）
+
+  if (!reportSheet) {
+    SpreadsheetApp.getUi().alert('Salesforceレポートという名前のシートが見つかりません。タブ名を確認してください。');
+    return;
+  }
+
+  const mainHeaders = mainSheet.getRange(1, 1, 1, mainSheet.getLastColumn()).getValues()[0];
+  const reportHeaders = reportSheet.getRange(1, 1, 1, reportSheet.getLastColumn()).getValues()[0];
+
+  const idx = (headers, name) => headers.findIndex(h => h && h.toString().includes(name)) + 1;
+
+  const colMainId = idx(mainHeaders, 'ID');
+  const colMainName = idx(mainHeaders, 'マンション名');
+  const colReportId = idx(reportHeaders, '商談ID(18桁)');
+  const colReportName = idx(reportHeaders, '商談名');
+
+  if (!colMainId || !colMainName || !colReportId || !colReportName) {
+    SpreadsheetApp.getUi().alert('必要な列（ID、マンション名、商談ID、商談名）が見つかりません。');
+    return;
+  }
+
+  const lastRowMain = mainSheet.getLastRow() - 1;
+  const lastRowReport = reportSheet.getLastRow() - 1;
+  const mainNamesRange = mainSheet.getRange(2, colMainName, lastRowMain).getValues();
+  const mainIdRange = mainSheet.getRange(2, colMainId, lastRowMain);
+  const mainLinkRange = mainSheet.getRange(2, colMainName, lastRowMain);
+
+  const reportData = reportSheet.getRange(2, 1, lastRowReport, reportSheet.getLastColumn()).getValues();
+
+  const reportMap = {};
+  reportData.forEach(row => {
+    const id = row[colReportId - 1];
+    const name = row[colReportName - 1];
+    if (name) reportMap[name] = id;
+  });
+
+  const linkPrefix = 'https://ubiden.lightning.force.com/lightning/r/Opportunity/';
+  const richTextValues = [];
+
+  for (let i = 0; i < mainNamesRange.length; i++) {
+    const name = mainNamesRange[i][0];
+    const id = reportMap[name];
+
+    if (id) {
+      // IDを書き込み
+      mainIdRange.getCell(i + 1, 1).setValue(id);
+      const richText = SpreadsheetApp.newRichTextValue()
+        .setText(name)
+        .setLinkUrl(`${linkPrefix}${id}/view`)
+        .build();
+      richTextValues.push([richText]);
+    } else {
+      const plainText = SpreadsheetApp.newRichTextValue()
+        .setText(name || '')
+        .build();
+      richTextValues.push([plainText]);
+    }
+  }
+
+  mainLinkRange.setRichTextValues(richTextValues);
+}
+
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('便利機能')
+    .addItem('メール作成リンクを生成', 'createGmailLinks')
+    .addItem('IDを付与', 'assignUniqueIds')
+    .addItem('Salesforceリンクを生成', 'createSalesforceLinks') // ✅ 追加
+    .addToUi();
 }
