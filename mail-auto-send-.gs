@@ -13,7 +13,7 @@ const SHEET_NAME = '1on1'; // メインで操作するシート名
 const CONTACT_SHEET_NAME = 'フロント担当者'; // 担当者名とメールアドレスが記載されたシート名
 const CC_MAP_SHEET_NAME = '営業担当者マップ'; // CC担当者名とメールアドレスが記載されたシート名
 const CONSTRUCTION_MAP_SHEET_NAME = '工事会社マップ'; // 工事会社名とメールアドレスが記載されたシート名
-const COMMON_CC_EMAIL = 'sales@ubiden.com'; // 固定で追加する共通CCアドレス
+const COMMON_CC_EMAIL = 'morimori901@yahoo.co.jp'; // 固定で追加する共通CCアドレス
 const REMINDER_DAYS_BEFORE = 3; // 理事会日の何日前に「前」メールを送信するか
 const REMINDER_DAYS_AFTER = 2;  // 理事会日の何日後に「後」メールを送信するか
 
@@ -275,7 +275,6 @@ function onOpen() {
     .addItem('✉️ メールリンクを一括生成', 'generateMailLinks')
     .addSeparator()
     .addItem('⚙️ IDを一括付番', 'assignUniqueIds')
-    .addItem('🔗 Salesforceリンクを作成', 'createSalesforceLinks')
     .addToUi();
 }
 
@@ -528,37 +527,37 @@ function getHeaderIndexFunction(sheet) {
 }
 
 function createEmailMap(ss, sheetName, nameHeader, emailHeader, companyHeader) {
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    console.error(`シート「${sheetName}」が見つかりません。`);
-    return null;
+  const mapSheet = ss.getSheetByName(sheetName);
+  if (!mapSheet) return null;
+
+  const idx = getHeaderIndexFunction(mapSheet);
+  const nameCol = idx(nameHeader);
+  const emailCol = idx(emailHeader);
+  const companyCol = companyHeader ? idx(companyHeader) : 0;
+  if (nameCol === 0 || emailCol === 0) return null;
+
+  const lastRow = mapSheet.getLastRow();
+
+  // データ行が存在しない場合（ヘッダーのみの場合）は空のマップを返す
+  if (lastRow < 2) {
+    return new Map();
   }
 
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const nameCol = headers.indexOf(nameHeader) + 1;
-  const emailCol = headers.indexOf(emailHeader) + 1;
-  const companyCol = companyHeader ? headers.indexOf(companyHeader) + 1 : 0;
-
-  if (nameCol === 0 || emailCol === 0) {
-    console.error(`シート「${sheetName}」に必要なヘッダー（${nameHeader}, ${emailHeader}）が見つかりません。`);
-    return null;
-  }
-
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
-  const map = new Map();
-  data.forEach(row => {
+  const data = mapSheet.getRange(2, 1, lastRow - 1, mapSheet.getLastColumn()).getValues();
+  const emailMap = new Map();
+  data.forEach((row, i) => {
     const name = row[nameCol - 1];
     const email = row[emailCol - 1];
-    if (name && email) {
-      const entry = { email: email };
-      if (companyCol > 0) {
-        entry.company = row[companyCol - 1] || '';
-      }
-      map.set(name.toString().trim(), entry);
+    if (name) {
+      emailMap.set(name.toString().trim(), {
+        email: email || '',
+        company: companyCol > 0 ? row[companyCol - 1] : ''
+      });
     }
   });
-  return map;
+  return emailMap;
 }
+
 
 // ✅ 新機能のみ追記：他の関数には一切変更を加えません
 function createSalesforceLinks() {
@@ -626,4 +625,3 @@ function createSalesforceLinks() {
 
   mainLinkRange.setRichTextValues(richTextValues);
 }
-
