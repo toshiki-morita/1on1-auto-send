@@ -275,6 +275,7 @@ function onOpen() {
     .addItem('✉️ メールリンクを一括生成', 'generateMailLinks')
     .addSeparator()
     .addItem('⚙️ IDを一括付番', 'assignUniqueIds')
+    .addItem('🔗 Salesforceリンクを作成', 'createSalesforceLinks')
     .addToUi();
 }
 
