@@ -627,11 +627,3 @@ function createSalesforceLinks() {
   mainLinkRange.setRichTextValues(richTextValues);
 }
 
-function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-  ui.createMenu('便利機能')
-    .addItem('メール作成リンクを生成', 'createGmailLinks')
-    .addItem('IDを付与', 'assignUniqueIds')
-    .addItem('Salesforceリンクを生成', 'createSalesforceLinks') // ✅ 追加
-    .addToUi();
-}
