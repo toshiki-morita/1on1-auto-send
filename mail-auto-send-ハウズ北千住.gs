@@ -13,7 +13,7 @@ const SHEET_NAME = '1on1'; // メインで操作するシート名
 const CONTACT_SHEET_NAME = 'フロント担当者'; // 担当者名とメールアドレスが記載されたシート名
 const CC_MAP_SHEET_NAME = '営業担当者マップ'; // CC担当者名とメールアドレスが記載されたシート名
 const CONSTRUCTION_MAP_SHEET_NAME = '工事会社マップ'; // 工事会社名とメールアドレスが記載されたシート名
-const COMMON_CC_EMAIL = 'morimori901@yahoo.co.jp'; // 固定で追加する共通CCアドレス
+const COMMON_CC_EMAIL = 'sales@ubiden.com'; // 固定で追加する共通CCアドレス
 const REMINDER_DAYS_BEFORE = 3; // 理事会日の何日前に「前」メールを送信するか
 const REMINDER_DAYS_AFTER = 2;  // 理事会日の何日後に「後」メールを送信するか
 
