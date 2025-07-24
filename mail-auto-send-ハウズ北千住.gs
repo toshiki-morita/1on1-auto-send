@@ -631,8 +631,8 @@ function 集約データ抽出() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sourceSheet = ss.getActiveSheet();
   const fileName = ss.getName();
+  const fileUrl = ss.getUrl();
 
-  // 転記先スプレッドシートとシート名（※必要に応じて変更）
   const targetSs = SpreadsheetApp.openById("1YqwmcO-UJHY3HzM2XG2qZCKF0RbRnVm2QZpCFcHBLDk");
   const targetSheet = targetSs.getSheetByName("アクション済み");
   if (!targetSheet) throw new Error('集約シートが見つかりません');
@@ -647,39 +647,66 @@ function 集約データ抽出() {
   const sourceData = sourceSheet.getDataRange().getValues();
   const sourceHeaders = sourceData[0];
   const dataRows = sourceData.slice(1);
+  const richData = sourceSheet.getRange(2, 1, dataRows.length, sourceHeaders.length).getRichTextValues();
 
-  // 元データ内で必要なヘッダーの列インデックス取得
   const colIndexes = requiredHeaders.map(h => sourceHeaders.indexOf(h));
   const dateColIndex = sourceHeaders.indexOf("次の理事会日/日付不明は1日で仮設定");
+  const proposalColIndex = sourceHeaders.indexOf("提案可否");
+  const mansionColIndex = sourceHeaders.indexOf("マンション名");
 
-  if (colIndexes.includes(-1) || dateColIndex === -1) {
+  if ([...colIndexes, dateColIndex, proposalColIndex, mansionColIndex].includes(-1)) {
     throw new Error("元シートに必要なヘッダーが存在しません");
   }
 
   // 転記先の全ヘッダー行を取得（1行目・A列含む）
   const headerRow = targetSheet.getRange(1, 1, 1, targetSheet.getLastColumn()).getValues()[0];
   const targetIndexes = requiredHeaders.map(h => headerRow.indexOf(h));
-
   if (targetIndexes.includes(-1)) {
     throw new Error("集約シートに必要なヘッダーが見つかりません");
   }
 
-  for (const row of dataRows) {
-    const dateVal = row[dateColIndex];
-    const proposalVal = row[sourceHeaders.indexOf("提案可否")];
-    
-    if (!(dateVal instanceof Date)) continue;
-    if (proposalVal !== "提案可") continue;
+  // --- 転記前に「同じファイル名」の行を削除して同期 ---
+  const lastRow = targetSheet.getLastRow();
+  if (lastRow > 1) {
+    const existingNames = targetSheet.getRange(2, 1, lastRow - 1, 1).getRichTextValues();
+    for (let i = existingNames.length - 1; i >= 0; i--) {
+      const val = existingNames[i][0];
+      if (val.getText() === fileName) {
+        targetSheet.deleteRow(i + 2); // ヘッダー行があるため +2
+      }
+    }
+  }
 
-    const extracted = colIndexes.map(i => row[i]);
+  for (let i = 0; i < dataRows.length; i++) {
+    const row = dataRows[i];
+    const richRow = richData[i];
+
+    const dateVal = row[dateColIndex];
+    const proposalVal = row[proposalColIndex];
+    if (!(dateVal instanceof Date)) continue;
+    if (proposalVal.toString().trim() !== "提案可") continue;
+
+    const extracted = colIndexes.map(index => row[index]);
     const lastRow = targetSheet.getLastRow() + 1;
 
-    targetSheet.getRange(lastRow, 1).setValue(fileName); // A列にファイル名
+    // A列：ファイル名（リンク付き）
+    const richFile = SpreadsheetApp.newRichTextValue()
+      .setText(fileName)
+      .setLinkUrl(fileUrl)
+      .build();
+    targetSheet.getRange(lastRow, 1).setRichTextValue(richFile);
 
-    targetIndexes.forEach((colIdx, i) => {
+    // B列以降：マンション名だけリンク付き、それ以外は普通に転記
+    targetIndexes.forEach((colIdx, j) => {
       if (colIdx >= 0) {
-        targetSheet.getRange(lastRow, colIdx + 1).setValue(extracted[i]);
+        const colNum = colIdx + 1;
+        if (requiredHeaders[j] === "マンション名") {
+          targetSheet.getRange(lastRow, colNum).setRichTextValue(richRow[mansionColIndex]);
+        } else {
+          targetSheet.getRange(lastRow, colNum).setValue(extracted[j]);
+        }
       }
     });
   }
 }
+
