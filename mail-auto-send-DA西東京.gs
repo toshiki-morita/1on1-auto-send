@@ -1,5 +1,4 @@
 /**
- * @OnlyCurrentDoc
  * 1on1管理シートから理事会日を読み取り、リマインドメールを自動送信するスクリプトです。
  * 毎日定時に実行されることを想定しています。
  * 
@@ -255,7 +254,7 @@ function composeAfterEmailContent(params) {
     '- 次回理事会や総会での扱い予定',
     '- 今後の進め方についてのご検討内容 など',
     '---',
-    '※本メールは社内での連携状況にかかわらず、自動的にお送りしております。すでにご対応済みの場合はご容赦くださいませ。',
+    '本メールは社内での連携状況にかかわらずお送りしております。すでにご対応済みの場合はご容赦くださいませ。',
     '',
     '',
     SIGNATURE
@@ -276,6 +275,7 @@ function onOpen() {
     .addSeparator()
     .addItem('⚙️ IDを一括付番', 'assignUniqueIds')
     .addItem('🔗 Salesforceリンクを作成', 'createSalesforceLinks')
+    .addItem("集約データ抽出", "集約データ抽出")
     .addToUi();
 }
 
@@ -625,4 +625,61 @@ function createSalesforceLinks() {
   }
 
   mainLinkRange.setRichTextValues(richTextValues);
+}
+
+function 集約データ抽出() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sourceSheet = ss.getActiveSheet();
+  const fileName = ss.getName();
+
+  // 転記先スプレッドシートとシート名（※必要に応じて変更）
+  const targetSs = SpreadsheetApp.openById("1YqwmcO-UJHY3HzM2XG2qZCKF0RbRnVm2QZpCFcHBLDk");
+  const targetSheet = targetSs.getSheetByName("アクション済み");
+  if (!targetSheet) throw new Error('集約シートが見つかりません');
+
+  const requiredHeaders = [
+    "マンション名", "住所", "支店・部署", "フロント担当者名", "総戸数",
+    "駐車場区画数", "平面区画数", "機械駐区画数", "提案可否", "理事会開催頻度",
+    "総会開催月", "次回理事会の関与形式", "次の理事会日/日付不明は1日で仮設定",
+    "CC担当1", "CC担当2", "SFA商談化フラグ"
+  ];
+
+  const sourceData = sourceSheet.getDataRange().getValues();
+  const sourceHeaders = sourceData[0];
+  const dataRows = sourceData.slice(1);
+
+  // 元データ内で必要なヘッダーの列インデックス取得
+  const colIndexes = requiredHeaders.map(h => sourceHeaders.indexOf(h));
+  const dateColIndex = sourceHeaders.indexOf("次の理事会日/日付不明は1日で仮設定");
+
+  if (colIndexes.includes(-1) || dateColIndex === -1) {
+    throw new Error("元シートに必要なヘッダーが存在しません");
+  }
+
+  // 転記先の全ヘッダー行を取得（1行目・A列含む）
+  const headerRow = targetSheet.getRange(1, 1, 1, targetSheet.getLastColumn()).getValues()[0];
+  const targetIndexes = requiredHeaders.map(h => headerRow.indexOf(h));
+
+  if (targetIndexes.includes(-1)) {
+    throw new Error("集約シートに必要なヘッダーが見つかりません");
+  }
+
+  for (const row of dataRows) {
+    const dateVal = row[dateColIndex];
+    const proposalVal = row[sourceHeaders.indexOf("提案可否")];
+    
+    if (!(dateVal instanceof Date)) continue;
+    if (proposalVal !== "提案可") continue;
+
+    const extracted = colIndexes.map(i => row[i]);
+    const lastRow = targetSheet.getLastRow() + 1;
+
+    targetSheet.getRange(lastRow, 1).setValue(fileName); // A列にファイル名
+
+    targetIndexes.forEach((colIdx, i) => {
+      if (colIdx >= 0) {
+        targetSheet.getRange(lastRow, colIdx + 1).setValue(extracted[i]);
+      }
+    });
+  }
 }
