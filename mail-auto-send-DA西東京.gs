@@ -1,8 +1,9 @@
 /**
+ * @OnlyCurrentDoc
  * 1on1管理シートから理事会日を読み取り、リマインドメールを自動送信するスクリプトです。
  * 毎日定時に実行されることを想定しています。
  * 
- * @version 1.0.0
+ * @version 1.7.0
  * @author Cascade
  * @license MIT
  */
@@ -212,13 +213,14 @@ function composeBeforeEmailContent(params) {
     companyName,
     `${contactName} 様`,
     '',
-    'いつもお世話になっております。ユビ電の森田です。',
+    'いつもお世話になっております。',
+    'ユビ電の営業サポートの森田です。',
     '',
-    `${property} の理事会が ${originalDateStr} に開催されるかと存じますので、`,
-    'EV充電設備に関するご案内について、リマインドのためご連絡を差し上げました。',
+    `${originalDateStr}開催予定の${property} 理事会にて、EV充電設備に関するご案内をお願いしたく、リマインドのご連絡を差し上げました。`,
+    'ご多用中恐れ入りますが、よろしくお願いいたします。',
     '',
-    'ご多用のところ恐縮ではございますが、理事会にてEV充電設備のご案内をいただけますよう、',
-    '何卒よろしくお願い申し上げます。',
+    '※理事会日程は以前の面談時に伺った内容をもとに記載しております。',
+    '未定の場合は月初で仮設定しておりますので、確定日や変更等ございましたらご教示いただけますと幸いです。',
     '',
     '',
     SIGNATURE
@@ -241,7 +243,7 @@ function composeAfterEmailContent(params) {
     companyName,
     `${contactName} 様`,
     '',
-    'いつもお世話になっております。ユビ電の森田です。',
+    'いつもお世話になっております。ユビ電の営業サポートの森田です。',
     '',
     `${property} の理事会が ${originalDateStr} に開催されたかと存じますが、`,
     'EV充電設備のご提案に関して、理事会でのご反応はいかがでしたでしょうか。',
@@ -250,11 +252,11 @@ function composeAfterEmailContent(params) {
     '',
     '---',
     '■ ご確認事項',
-    '- ご提案に対する決定事項の有無',
+    '- ご提案の有無',
     '- 次回理事会や総会での扱い予定',
     '- 今後の進め方についてのご検討内容 など',
     '---',
-    '本メールは社内での連携状況にかかわらずお送りしております。すでにご対応済みの場合はご容赦くださいませ。',
+    '※本メールは社内での連携状況にかかわらずお送りしております。すでにご対応済みの場合はご容赦くださいませ。',
     '',
     '',
     SIGNATURE
@@ -274,8 +276,6 @@ function onOpen() {
     .addItem('✉️ メールリンクを一括生成', 'generateMailLinks')
     .addSeparator()
     .addItem('⚙️ IDを一括付番', 'assignUniqueIds')
-    .addItem('🔗 Salesforceリンクを作成', 'createSalesforceLinks')
-    .addItem("集約データ抽出", "集約データ抽出")
     .addToUi();
 }
 
@@ -431,13 +431,14 @@ function createGmailFormula(params) {
       companyName,
       `${contactName} 様`,
       '',
-      'いつもお世話になっております。ユビ電の森田です。',
+      'いつもお世話になっております。',
+      'ユビ電の営業サポートの森田です。',
       '',
-      `${property} の理事会が ${originalDateStr} に開催されるかと存じますので、`,
-      'EV充電設備に関するご案内について、リマインドのためご連絡を差し上げました。',
+      `${originalDateStr}開催予定の${property} 理事会にて、EV充電設備に関するご案内をお願いしたく、リマインドのご連絡を差し上げました。`,
+      'ご多用中恐れ入りますが、よろしくお願いいたします。',
       '',
-      'ご多用のところ恐縮ではございますが、理事会にてEV充電設備のご案内をいただけますよう、',
-      '何卒よろしくお願い申し上げます。',
+      '※理事会日程は以前の面談時に伺った内容をもとに記載しております。',
+      '未定の場合は月初で仮設定しておりますので、確定日や変更等ございましたらご教示いただけますと幸いです。'
     ].join('\n');
   } else {
     subject = `[ユビ電]EV充電設備ご提案の理事会後の状況について（${property}）`;
@@ -445,7 +446,7 @@ function createGmailFormula(params) {
       companyName,
       `${contactName} 様`,
       '',
-      'いつもお世話になっております。ユビ電の森田です。',
+      'いつもお世話になっております。ユビ電の営業サポートの森田です。',
       '',
       `${property} の理事会が ${originalDateStr} に開催されたかと存じますが、`,
       'EV充電設備のご提案に関して、理事会でのご反応はいかがでしたでしょうか。',
@@ -454,11 +455,11 @@ function createGmailFormula(params) {
       '',
       '---',
       '■ ご確認事項',
-      '- ご提案に対する決定事項の有無',
+      '- ご提案の有無',
       '- 次回理事会や総会での扱い予定',
       '- 今後の進め方についてのご検討内容 など',
       '---',
-      '※本メールは社内での連携状況にかかわらず、自動的にお送りしております。すでにご対応済みの場合はご容赦くださいませ。',
+      '※本メールは社内での連携状況にかかわらずお送りしております。すでにご対応済みの場合はご容赦くださいませ。',
     ].join('\n');
   }
 
@@ -626,87 +627,3 @@ function createSalesforceLinks() {
 
   mainLinkRange.setRichTextValues(richTextValues);
 }
-
-function 集約データ抽出() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sourceSheet = ss.getActiveSheet();
-  const fileName = ss.getName();
-  const fileUrl = ss.getUrl();
-
-  const targetSs = SpreadsheetApp.openById("1YqwmcO-UJHY3HzM2XG2qZCKF0RbRnVm2QZpCFcHBLDk");
-  const targetSheet = targetSs.getSheetByName("アクション済み");
-  if (!targetSheet) throw new Error('集約シートが見つかりません');
-
-  const requiredHeaders = [
-    "マンション名", "住所", "支店・部署", "フロント担当者名", "総戸数",
-    "駐車場区画数", "平面区画数", "機械駐区画数", "提案可否", "理事会開催頻度",
-    "総会開催月", "次回理事会の関与形式", "次の理事会日/日付不明は1日で仮設定",
-    "CC担当1", "CC担当2", "SFA商談化フラグ"
-  ];
-
-  const sourceData = sourceSheet.getDataRange().getValues();
-  const sourceHeaders = sourceData[0];
-  const dataRows = sourceData.slice(1);
-  const richData = sourceSheet.getRange(2, 1, dataRows.length, sourceHeaders.length).getRichTextValues();
-
-  const colIndexes = requiredHeaders.map(h => sourceHeaders.indexOf(h));
-  const dateColIndex = sourceHeaders.indexOf("次の理事会日/日付不明は1日で仮設定");
-  const proposalColIndex = sourceHeaders.indexOf("提案可否");
-  const mansionColIndex = sourceHeaders.indexOf("マンション名");
-
-  if ([...colIndexes, dateColIndex, proposalColIndex, mansionColIndex].includes(-1)) {
-    throw new Error("元シートに必要なヘッダーが存在しません");
-  }
-
-  // 転記先の全ヘッダー行を取得（1行目・A列含む）
-  const headerRow = targetSheet.getRange(1, 1, 1, targetSheet.getLastColumn()).getValues()[0];
-  const targetIndexes = requiredHeaders.map(h => headerRow.indexOf(h));
-  if (targetIndexes.includes(-1)) {
-    throw new Error("集約シートに必要なヘッダーが見つかりません");
-  }
-
-  // --- 転記前に「同じファイル名」の行を削除して同期 ---
-  const lastRow = targetSheet.getLastRow();
-  if (lastRow > 1) {
-    const existingNames = targetSheet.getRange(2, 1, lastRow - 1, 1).getRichTextValues();
-    for (let i = existingNames.length - 1; i >= 0; i--) {
-      const val = existingNames[i][0];
-      if (val.getText() === fileName) {
-        targetSheet.deleteRow(i + 2); // ヘッダー行があるため +2
-      }
-    }
-  }
-
-  for (let i = 0; i < dataRows.length; i++) {
-    const row = dataRows[i];
-    const richRow = richData[i];
-
-    const dateVal = row[dateColIndex];
-    const proposalVal = row[proposalColIndex];
-    if (!(dateVal instanceof Date)) continue;
-    if (proposalVal.toString().trim() !== "提案可") continue;
-
-    const extracted = colIndexes.map(index => row[index]);
-    const lastRow = targetSheet.getLastRow() + 1;
-
-    // A列：ファイル名（リンク付き）
-    const richFile = SpreadsheetApp.newRichTextValue()
-      .setText(fileName)
-      .setLinkUrl(fileUrl)
-      .build();
-    targetSheet.getRange(lastRow, 1).setRichTextValue(richFile);
-
-    // B列以降：マンション名だけリンク付き、それ以外は普通に転記
-    targetIndexes.forEach((colIdx, j) => {
-      if (colIdx >= 0) {
-        const colNum = colIdx + 1;
-        if (requiredHeaders[j] === "マンション名") {
-          targetSheet.getRange(lastRow, colNum).setRichTextValue(richRow[mansionColIndex]);
-        } else {
-          targetSheet.getRange(lastRow, colNum).setValue(extracted[j]);
-        }
-      }
-    });
-  }
-}
-
