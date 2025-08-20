@@ -506,3 +506,163 @@ function createSalesforceLinks() {
 
   mainLinkRange.setRichTextValues(richTextValues);
 }
+
+/**
+ * シート編集イベントハンドラ。
+ * 1on1シートの「フロント担当者/次の理事会日」（旧: フロント担当者名/総会開催月）編集時のみ、
+ * 変更前後の値を「更新ログ」シートに記録し、編集セルをハイライトします。
+ * 
+ * - ログ列: [日時, ユーザー, シート, セル, 列見出し, 旧値, 新値, 旧→新]
+ * - 複数セルの一括編集や貼り付け時は oldValue が取得できない場合があります（仕様）。
+ * 
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e 編集イベント
+ */
+function onEdit(e) {
+  if (!e || !e.range) return; // 手動実行ガード
+  logUpdate(e);
+  highlightEditedCells(e);
+  autoUpdateSfaFlag(e);
+}
+
+/**
+ * 編集内容を「更新ログ」シートへ追記します。
+ * 複数セルの一括編集では oldValue が取得できないため、旧値が空になる場合があります。
+ * 日付は yyyy/MM/dd に正規化して保存します。
+ *
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e 編集イベント
+ */
+function logUpdate(e) {
+  const sheetNameToTrack = '1on1';
+  const editedSheet = e.range.getSheet();
+  if (editedSheet.getName() !== sheetNameToTrack) return;
+
+  const headers = editedSheet.getRange(1, 1, 1, editedSheet.getLastColumn()).getValues()[0];
+  const idx = name => headers.findIndex(h => h && h.toString().includes(name)) + 1;
+  const colContact = idx('フロント担当者名') || idx('フロント担当者');
+  const colMeetingDate = idx('総会開催月') || idx('次の理事会日') || idx('理事会日');
+  if (![colContact, colMeetingDate].includes(e.range.getColumn())) return;
+
+  // ログシート取得/作成
+  let logSheet = e.source.getSheetByName('更新ログ');
+  const created = !logSheet;
+  if (!logSheet) {
+    logSheet = e.source.insertSheet('更新ログ');
+  }
+  if (created && logSheet.getLastRow() === 0) {
+    logSheet.appendRow(['日時', 'ユーザー', 'シート', 'セル', '列見出し', '旧値', '新値', '旧→新']);
+  }
+
+  // 列見出し取得
+  const headerName = editedSheet.getRange(1, e.range.getColumn()).getDisplayValue();
+  
+  // 旧値・新値の取得
+  const oldValue = e.oldValue ?? '';
+  const newValue = e.range.getValue();
+  
+  logSheet.appendRow([
+    Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss'),
+    Session.getActiveUser().getEmail(),
+    sheetNameToTrack,
+    e.range.getA1Notation(),
+    headerName,
+    oldValue,
+    newValue,
+    `${oldValue} → ${newValue}`
+  ]);
+}
+
+/**
+ * 編集セルを薄い黄色でハイライトします（対象列のみ）。
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e 編集イベント
+ */
+function highlightEditedCells(e) {
+  const sheetNameToTrack = '1on1';
+  const sheet = e.range.getSheet();
+  if (sheet.getName() !== sheetNameToTrack) return;
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const idx = name => headers.findIndex(h => h && h.toString().includes(name)) + 1;
+  const colContact = idx('フロント担当者名') || idx('フロント担当者');
+  const colMeetingDate = idx('総会開催月') || idx('次の理事会日') || idx('理事会日');
+  if (![colContact, colMeetingDate].includes(e.range.getColumn())) return;
+
+  e.range.setBackground('#fff2cc');
+}
+
+/**
+ * 提案可否の変更やメモ列の背景色変更に応じて、SFA商談化フラグを自動更新します。
+ * ログには記録されません。
+ * 
+ * ルール:
+ * - 提案可否 = "提案可" → SFA商談化フラグ = "リード化"
+ * - 提案可否 = "提案不可" → SFA商談化フラグ = "失注"
+ * - 提案可否 = "保留" → SFA商談化フラグ = "保留"
+ * - メモ列の背景色 = #e6b8af → SFA商談化フラグ = "次年度持越し"
+ * 
+ * @param {GoogleAppsScript.Events.SheetsOnEdit} e 編集イベント
+ */
+function autoUpdateSfaFlag(e) {
+  const sheetNameToTrack = '1on1';
+  const editedSheet = e.range.getSheet();
+  if (editedSheet.getName() !== sheetNameToTrack) return;
+
+  const headers = editedSheet.getRange(1, 1, 1, editedSheet.getLastColumn()).getValues()[0];
+  const idx = name => headers.findIndex(h => h && h.toString().includes(name)) + 1;
+  
+  const colProposal = idx('提案可否');
+  const colSfaFlag = idx('リード判定フラグ');
+  const colMemo = idx('メモ');
+  
+  if (!colSfaFlag) return; // SFA商談化フラグ列がない場合は何もしない
+  
+  const currentRow = e.range.getRow();
+  const sfaFlagCell = editedSheet.getRange(currentRow, colSfaFlag);
+  
+  // 提案可否の変更をチェック
+  if (colProposal && e.range.getColumn() === colProposal) {
+    const newValue = e.range.getValue();
+    if (newValue === '提案可') {
+      sfaFlagCell.setValue('リード化');
+    } else if (newValue === '提案不可') {
+      sfaFlagCell.setValue('失注');
+    } else if (newValue === '保留') {
+      sfaFlagCell.setValue('保留');
+    }
+    return;
+  }
+  
+  // メモ列の背景色変更をチェック
+  if (colMemo && e.range.getColumn() === colMemo) {
+    const backgroundColor = e.range.getBackground();
+    if (backgroundColor === '#e6b8af') {
+      sfaFlagCell.setValue('次年度持越し');
+    }
+    return;
+  }
+}
+
+/**
+ * ログ用の文字列に正規化するユーティリティ。
+ * - null/undefined は空文字
+ * - Date または日時として解釈可能な文字列は yyyy/MM/dd に整形
+ * - それ以外は文字列化
+ * @param {*} val 任意の値
+ * @returns {string} 正規化済み文字列
+ */
+function normalizeForLog_(val) {
+  if (val === null || val === undefined) return '';
+  // Date 型
+  if (Object.prototype.toString.call(val) === '[object Date]') {
+    const d = /** @type {Date} */ (val);
+    if (!isNaN(d.getTime())) {
+      return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy/MM/dd');
+    }
+  }
+  // 文字列を日付として解釈できるか試す
+  const s = String(val);
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    return Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy/MM/dd');
+  }
+  return s;
+}
