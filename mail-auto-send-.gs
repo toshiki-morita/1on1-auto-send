@@ -1,7 +1,7 @@
 /**
  * @OnlyCurrentDoc
- * 1on1管理シートから理事会日を読み取り、リマインドメールを自動送信するスクリプトです。
- * 毎日定時に実行されることを想定しています。
+ * 1on1管理シートから理事会日を読み取り、メール関連の補助機能（リンク生成等）を提供するスクリプトです。
+ * 本版では「自動送信」機能は明示的に無効化されています（トリガーも作成しません）。
  * 
  * @version 1.0.0
  * @author Cascade
@@ -13,7 +13,7 @@ const SHEET_NAME = '1on1'; // メインで操作するシート名
 const CONTACT_SHEET_NAME = 'フロント担当者'; // 担当者名とメールアドレスが記載されたシート名
 const CC_MAP_SHEET_NAME = '営業担当者マップ'; // CC担当者名とメールアドレスが記載されたシート名
 const CONSTRUCTION_MAP_SHEET_NAME = '工事会社マップ'; // 工事会社名とメールアドレスが記載されたシート名
-const COMMON_CC_EMAIL = 'sales@ubiden.com'; // 固定で追加する共通CCアドレス
+const COMMON_CC_EMAIL = 'morimori901@yahoo.co.jp'; // 固定で追加する共通CCアドレス
 const REMINDER_DAYS_BEFORE = 3; // 理事会日の何日前に「前」メールを送信するか
 const REMINDER_DAYS_AFTER = 2;  // 理事会日の何日後に「後」メールを送信するか
 
@@ -39,164 +39,44 @@ HP： https://www.ubiden.com
 // --- 設定項目ここまで ---
 
 /**
- * 日次トリガーを設定するための関数です。手動で一度実行してください。
+ * 自動送信機能は無効化されています。
+ * 既存の sendScheduledEmails トリガーがあれば削除し、新規作成は行いません（手動実行用）。
  */
 function createDailyTrigger() {
-  // 既存のトリガーを削除
+  // 自動送信は無効化ポリシー：既存の sendScheduledEmails トリガーがあれば削除のみ行い、新規作成はしない
   const triggers = ScriptApp.getProjectTriggers();
   for (const trigger of triggers) {
     if (trigger.getHandlerFunction() === 'sendScheduledEmails') {
       ScriptApp.deleteTrigger(trigger);
     }
   }
-  // 新しいトリガーを設定（毎日午前9時〜10時）
-  ScriptApp.newTrigger('sendScheduledEmails')
-    .timeBased()
-    .atHour(9)
-    .everyDays(1)
-    .create();
-  SpreadsheetApp.getUi().alert('毎日午前9時〜10時にメールを自動送信する設定が完了しました。');
+  // 新規トリガーは作成しない
+  try {
+    SpreadsheetApp.getUi().alert('自動送信機能は無効化されています。トリガーは作成しませんでした。');
+  } catch (e) {
+    // UI が無い実行環境（トリガー等）でも落ちないようにする
+    console.warn('自動送信機能は無効化されています。トリガーは作成されません。');
+    Logger.log('createDailyTrigger: 自動送信は無効化されています（trigger not created）');
+  }
 }
 
 /**
- * スケジュールに基づいてリマインドメールを送信します。
- * この関数がトリガーによって自動実行されます。
+ * 自動送信は無効化されています。
+ * 既存のトリガー用関数名は維持しますが、処理は行いません（no-op）。
  */
 function sendScheduledEmails() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    console.error(`シート「${SHEET_NAME}」が見つかりません。`);
-    return;
+  // 自動送信は無効化されています。何も行いません。
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss && typeof ss.toast === 'function') {
+      ss.toast('自動送信は無効化されています（sendScheduledEmails は no-op）。', 'Info', 5);
+    }
+  } catch (e) {
+    // 非対話実行時（トースト不可）
+    console.warn('sendScheduledEmails: 自動送信は無効化されています（no-op）');
+    Logger.log('sendScheduledEmails: 自動送信は無効化されています（no-op）');
   }
-
-  // 各種メールアドレスのマップを作成
-  const contactMap = createEmailMap(ss, CONTACT_SHEET_NAME, 'フロント担当者名', 'メールアドレス', '会社名');
-  const ccContactMap = createEmailMap(ss, CC_MAP_SHEET_NAME, '営業担当者名', 'メールアドレス');
-  const constructionMap = createEmailMap(ss, CONSTRUCTION_MAP_SHEET_NAME, '工事会社名', 'メールアドレス', '会社名');
-
-  if (!contactMap || !ccContactMap || !constructionMap) {
-    console.error('「フロント担当者」「営業担当者マップ」「工事会社マップ」のいずれかのシートまたはヘッダーが正しくありません。');
-    return;
-  }
-
-  const idx = getHeaderIndexFunction(sheet);
-  const cols = {
-    property: idx('マンション名'),
-    meetingDate: idx('次の理事会日'),
-    contactName: idx('フロント担当者'),
-    beforeSentDate: idx('理事会前メール送信日'), // ★要追加: 送信済みかを記録する列
-    afterSentDate: idx('理事会後メール送信日'),   // ★要追加: 送信済みかを記録する列
-    disableSend: idx('自動送信無効'),   // ★追加: 自動送信を無効にするフラグ列
-    ccStaff1: idx('CC担当1'),
-    ccStaff2: idx('CC担当2'),
-    constructionCompany: idx('工事会社'),
-    branch: idx('支店・部署'),
-  };
-
-  // 必須列の存在チェック
-  const requiredCols = ['property', 'meetingDate', 'contactName', 'beforeSentDate', 'afterSentDate'];
-  for (const key of requiredCols) {
-    if (cols[key] === 0) {
-      console.error(`必須列が見つかりません: ${key}`);
-      return;
-    }
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // 時刻をリセットして日付のみで比較
-
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
-
-  data.forEach((row, i) => {
-    const currentRowNum = i + 2;
-    const meetingDate = row[cols.meetingDate - 1];
-    const propertyName = row[cols.property - 1];
-    const contactName = row[cols.contactName - 1];
-    const beforeSentDate = row[cols.beforeSentDate - 1];
-    const afterSentDate = row[cols.afterSentDate - 1];
-
-    // 必須情報がなければスキップ
-    if (!(meetingDate instanceof Date) || !propertyName || !contactName) {
-      return;
-    }
-
-    const disableSendFlag = cols.disableSend > 0 ? row[cols.disableSend - 1] : false;
-    if (disableSendFlag === true) {
-      return; // 自動送信無効フラグが立っていればスキップ
-    }
-
-    const contactInfo = contactMap.get(contactName.toString().trim());
-    if (!contactInfo || !contactInfo.email) {
-      console.log(`行 ${currentRowNum}: フロント担当者「${contactName}」のメールアドレスまたは会社情報が見つかりません。`);
-      return;
-    }
-    const toEmail = contactInfo.email;
-    const companyName = contactInfo.company;
-
-    const commonParams = {
-      property: propertyName,
-      meetingDate: meetingDate,
-      contactName: contactName,
-      branch: cols.branch > 0 ? row[cols.branch - 1] : '',
-      companyName: companyName
-    };
-
-    // CCメールアドレスのリストを作成 (共通化)
-    const ccEmails = [COMMON_CC_EMAIL];
-    const ccStaff1Name = cols.ccStaff1 > 0 ? row[cols.ccStaff1 - 1] : '';
-    if (ccStaff1Name) {
-      const ccInfo = ccContactMap.get(ccStaff1Name.toString().trim());
-      if (ccInfo && ccInfo.email) ccEmails.push(ccInfo.email);
-    }
-    const ccStaff2Name = cols.ccStaff2 > 0 ? row[cols.ccStaff2 - 1] : '';
-    if (ccStaff2Name) {
-      const ccInfo = ccContactMap.get(ccStaff2Name.toString().trim());
-      if (ccInfo && ccInfo.email) ccEmails.push(ccInfo.email);
-    }
-    const constructionCompanyName = cols.constructionCompany > 0 ? row[cols.constructionCompany - 1] : '';
-    if (constructionCompanyName) {
-      const constructionInfo = constructionMap.get(constructionCompanyName.toString().trim());
-      if (constructionInfo && constructionInfo.email) ccEmails.push(constructionInfo.email);
-    }
-    const ccString = ccEmails.filter(Boolean).join(',');
-
-    // --- 理事会「前」のメール送信チェック ---
-    if (!beforeSentDate) {
-      const beforeSendDate = new Date(meetingDate.getTime());
-      beforeSendDate.setDate(beforeSendDate.getDate() - REMINDER_DAYS_BEFORE);
-      beforeSendDate.setHours(0, 0, 0, 0);
-
-      if (today.getTime() === beforeSendDate.getTime()) {
-        const emailContent = composeBeforeEmailContent(commonParams);
-        try {
-          GmailApp.sendEmail(toEmail, emailContent.subject, emailContent.body, { cc: ccString });
-          sheet.getRange(currentRowNum, cols.beforeSentDate).setValue(new Date());
-          console.log(`行 ${currentRowNum} (${propertyName}) の理事会「前」メールを送信しました。`);
-        } catch (e) {
-          console.error(`行 ${currentRowNum} の理事会「前」メール送信に失敗しました: ${e.message}`);
-        }
-      }
-    }
-
-    // --- 理事会「後」のメール送信チェック ---
-    if (!afterSentDate) {
-      const afterSendDate = new Date(meetingDate.getTime());
-      afterSendDate.setDate(afterSendDate.getDate() + REMINDER_DAYS_AFTER);
-      afterSendDate.setHours(0, 0, 0, 0);
-
-      if (today.getTime() === afterSendDate.getTime()) {
-        const emailContent = composeAfterEmailContent(commonParams);
-        try {
-          GmailApp.sendEmail(toEmail, emailContent.subject, emailContent.body, { cc: ccString });
-          sheet.getRange(currentRowNum, cols.afterSentDate).setValue(new Date());
-          console.log(`行 ${currentRowNum} (${propertyName}) の理事会「後」メールを送信しました。`);
-        } catch (e) {
-          console.error(`行 ${currentRowNum} の理事会「後」メール送信に失敗しました: ${e.message}`);
-        }
-      }
-    }
-  });
+  return;
 }
 
 /**
