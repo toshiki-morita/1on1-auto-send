@@ -594,10 +594,10 @@ function highlightEditedCells(e) {
  * ログには記録されません。
  * 
  * ルール:
- * - 提案可否 = "提案可" → SFA商談化フラグ = "リード化"
- * - 提案可否 = "提案不可" → SFA商談化フラグ = "失注"
- * - 提案可否 = "保留" → SFA商談化フラグ = "保留"
- * - メモ列の背景色 = #e6b8af → SFA商談化フラグ = "次年度持越し"
+ * - 提案可否 = "提案可" → リード判定フラグ = "リード化"
+ * - 提案可否 = "不可" → リード判定フラグ = "失注"
+ * - 提案可否 = "保留" → リード判定フラグ = "保留"
+ * - メモ列の背景色 = #e6b8af → リード判定フラグ = "次年度持越し"
  * 
  * @param {GoogleAppsScript.Events.SheetsOnEdit} e 編集イベント
  */
@@ -623,7 +623,7 @@ function autoUpdateSfaFlag(e) {
     const newValue = e.range.getValue();
     if (newValue === '提案可') {
       sfaFlagCell.setValue('リード化');
-    } else if (newValue === '提案不可') {
+    } else if (newValue === '不可') {
       sfaFlagCell.setValue('失注');
     } else if (newValue === '保留') {
       sfaFlagCell.setValue('保留');
